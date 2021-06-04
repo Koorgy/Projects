@@ -1,119 +1,147 @@
-import pygame
-
-pygame.init()
-win = pygame.display.set_mode((500,500))
-
-pygame.display.set_caption("Grape story")
-
-walkRight = [pygame.image.load('D:\Projects\client\gig1.png'), pygame.image.load('D:\Projects\client\gig2.png'), pygame.image.load('D:\Projects\client\gig3.png'), pygame.image.load('D:\Projects\client\gig4.png'), pygame.image.load('D:\Projects\client\gig5.png'), pygame.image.load('D:\Projects\client\gig6.png')]
-
-walkLeft = [pygame.image.load('D:\Projects\client\lef1.png'), pygame.image.load('D:\Projects\client\lef2.png'), pygame.image.load('D:\Projects\client\lef3.png'), pygame.image.load('D:\Projects\client\lef4.png'), pygame.image.load('D:\Projects\client\lef5.png'), pygame.image.load('D:\Projects\client\lef6.png')]
-
-bg = pygame.image.load('D:\Projects\client\gg.jpg')
-playerStand = pygame.image.load('D:\Projects\client\idle.png')
+import pygame, sys
+import os
+os.chdir('D:\\Projects\\client')
 
 clock = pygame.time.Clock()
 
-x = 50
-y = 425
-WIGHT = 60
-HEIGHT = 71
-speed = 5
+from pygame.locals import *
+pygame.init()
 
-isJump = False
-jumpCount = 10
+pygame.display.set_caption("Grape story")					#Window name
 
-left = False
-right = False
-animCount = 0
-lastMove = "right"
+WINDOW_SIZE = (600,400)									#Установка размера экрана
 
-class shoot():
-	def __init__(self, x, y, radius, color, facing):
-		self.x = x
-		self.y = y
-		self.radius = radius
-		self.color = color
-		self.facing = facing
-		self.vel = 8 * facing
+screen = pygame.display.set_mode(WINDOW_SIZE,0,32)			#Инициализация экрана
 
-	def draw(self, win):
-		pygame.draw.circle(win, self.color, (self.x, self.y), self.radius)
+display = pygame.Surface((300,200))
 
-def drawWindow():
-	global animCount
-	win.blit(bg,(0,0))
+moving_right = False
+moving_left = False
+vertical_momentum = 0
+air_timer = 0
 
-	if animCount + 1 >= 30:
-		animCount = 0
+true_scroll = [0,0]
+
+def load_map(path):
+	f = open(path + '.txt', 'r')
+	data = f.read()
+	f.close()
+	data = data.split('\n')
+	game_map = []
+	for row in data:
+		game_map.append(list(row))
+	return game_map
+
+game_map = load_map('map')
+
+grass_image = pygame.image.load('D:\Projects\client\images\TileSet\CentredUp.png')
+stone_image = pygame.image.load('D:\Projects\client\images\TileSet\Centred.png')
+
+player_img = pygame.image.load('D:\Projects\client\images\RunR\C1.png').convert()
+player_img.set_colorkey((0, 0, 0))
+
+player_rect = pygame.Rect(100, 100, 5, 13)
+
+background_objects = [[0.25,[120,10,70,400]],[0.25,[280,30,40,400]],[0.5,[30,40,40,400]],[0.5,[130,90,100,400]],[0.5,[300,80,120,400]]]
+
+def collision_test(rect, tiles):
+	hit_list = []
+	for tile in tiles:
+		if rect.colliderect(tile):
+			hit_list.append(tile)
+	return hit_list
+
+def move(rect, movement, tiles):
+	collision_types = {'top': False, 'bottom': False, 'right': False, 'left': False}
+	rect.x += movement[0]
+	hit_list = collision_test(rect, tiles)
+	for tile in hit_list:
+		if movement[0] > 0:
+			rect.right = tile.left
+			collision_types['right'] = True
+		elif movement[0] < 0:
+			rect.left = tile.right
+			collision_types['left'] = True
+	rect.y += movement[1]
+	hit_list = collision_test(rect, tiles)
+	for tile in hit_list:
+		if movement[1] > 0:
+			rect.bottom = tile.top
+			collision_types['bottom'] = True
+		elif movement[1] < 0:
+			rect.top = tile.bottom
+			collision_types['top'] = True
+	return rect, collision_types
+
+while True:
+	display.fill((204,187,163))
+
+	true_scroll[0] += (player_rect.x-true_scroll[0]-152)/20
+	true_scroll[1] += (player_rect.y-true_scroll[1]-106)/20
+	scroll = true_scroll.copy()
+	scroll[0] = int(scroll[0])
+	scroll[1] = int(scroll[1])
+
+	pygame.draw.rect(display,(7,80,75),pygame.Rect(0,120,300,80))
+	for background_object in background_objects:
+		obj_rect = pygame.Rect(background_object[1][0]-scroll[0]*background_object[0],background_object[1][1]-scroll[1]*background_object[0],background_object[1][2],background_object[1][3])
+		if background_object[0] == 0.5:
+			pygame.draw.rect(display,(14,222,150),obj_rect)
+		else:
+			pygame.draw.rect(display,(9,91,85),obj_rect)
+
+	tile_rects = []
+	y = 0
+	for layer in game_map:
+		x = 0
+		for tile in layer:
+			if tile == '1':
+				display.blit(stone_image, (x * 16 - scroll[0], y * 16 - scroll[1]))
+			if tile == '2':
+				display.blit(grass_image, (x * 16 - scroll[0], y * 16 - scroll[1]))
+			if tile != '0':
+				tile_rects.append(pygame.Rect(x * 16, y * 16, 16, 16))
+			x += 1
+		y += 1
 	
-	if left:
-		win.blit(walkLeft[animCount // 5], (x,y))
-		animCount += 1
-	elif right:
-		win.blit(walkRight[animCount // 5], (x,y))
-		animCount += 1
+	player_movement = [0,0]
+	if moving_right == True:
+		player_movement[0] += 2
+	if moving_left == True:
+		player_movement[0] -= 2
+	player_movement[1] += vertical_momentum
+	vertical_momentum += 0.2
+	if vertical_momentum > 3:
+		vertical_momentum = 3
+
+	player_rect, collisions = move(player_rect, player_movement, tile_rects)
+
+	if collisions['bottom'] == True:
+		air_timer = 0
+		vertical_momentum = 0
 	else:
-		win.blit(playerStand, (x,y))
+		air_timer += 1
 
-	for bullet in bullets:
-		bullet.draw(win)
-
-	pygame.display.update()
-
-run = True
-bullets = []
-
-while run:
-	clock.tick(30)
+	display.blit(player_img,(player_rect.x - scroll[0], player_rect.y - scroll[1]))
 
 	for event in pygame.event.get():
-		if event.type == pygame.QUIT:
-			run = False
+		if event.type == QUIT:								#Проверка на закрытия окна
+			pygame.quit()									#Остановка pygame
+			sys.exit()										#Остановка скрипта
+		if event.type == KEYDOWN:
+			if event.key == K_RIGHT:
+				moving_right = True
+			if event.key == K_LEFT:
+				moving_left = True
+			if event.key == K_UP:
+				if air_timer < 6:
+					vertical_momentum = -5
+		if event.type == KEYUP:
+			if event.key == K_RIGHT:
+				moving_right = False
+			if event.key == K_LEFT:
+				moving_left = False
 
-	for bullet in bullets:
-		if bullet.x < 500 and bullet.x > 0:
-			bullet.x += bullet.vel
-		else:
-			bullets.pop(bullets.index(bullet))
-
-	keys = pygame.key.get_pressed()
-
-	if keys[pygame.K_f]:
-		if lastMove == "right":
-			facing = 1
-		else:
-			facing = -1
-		if len(bullets) < 5:
-			bullets.append(shoot(round(x + WIGHT // 2), round(y + HEIGHT // 2), 5, (255,0,0), facing))
-
-	if keys[pygame.K_LEFT] and x > 5:
-		x -= speed
-		left = True
-		right = False
-		lastMove = "left"
-	elif keys[pygame.K_RIGHT] and x < 500 - WIGHT - 5:
-		x += speed
-		left = False
-		right = True
-		lastMove = "right"
-	else:
-		left = False
-		right = False
-		animCount = 0
-	if not(isJump):
-		if keys[pygame.K_SPACE]:
-			isJump = True
-	else:
-		if jumpCount >= -10:
-			if jumpCount < 0:
-				y += (jumpCount ** 2) / 2
-			else:
-				y -= (jumpCount ** 2) / 2
-			jumpCount -= 1
-		else:
-			isJump = False
-			jumpCount = 10
-	drawWindow()
-
-pygame.quit()
+	screen.blit(pygame.transform.scale(display,WINDOW_SIZE),(0,0))
+	pygame.display.update()									#Обновление экрана
+	clock.tick(60)											#Значение FPS
