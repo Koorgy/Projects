@@ -60,10 +60,10 @@ sounds['jump'].set_volume(0.3)
 
 
 def reload_level(restart_audio=True):
-    global player, projectiles, particles, scroll_target, events, soul_mode, level_time, player_mana, level_map, player_message, zoom, death, next_level, door, ready_to_exit
+    global player, projectiles, particles, scroll_target, events, grape_mode, level_time, player_mana, level_map, player_message, zoom, death, next_level, door, ready_to_exit
     level_map.load_map(level_name + '.json')
     player.pos = level_spawns[level_name].copy()
-    soul.pos = level_spawns[level_name].copy()
+    grape.pos = level_spawns[level_name].copy()
     player.rotation = 0
     scroll_target = player.pos
     true_scroll = [player.center[0] - display.get_width() // 2, player.center[1] - display.get_height() // 2]
@@ -75,7 +75,7 @@ def reload_level(restart_audio=True):
         'lv2timer': 0,
         'lv3timer': 0,
     }
-    soul_mode = 0
+    grape_mode = 0
     level_time = 0
     player_mana = 1
     death = 0
@@ -106,7 +106,7 @@ def advance(pos, rot, amt):
     pos[1] += math.sin(rot) * amt
     return pos
 
-def render_mana(loc, size=[2, 3], color1=(255, 255, 255), color2=(12, 230, 242)):
+def render_mana(loc, size=[2, 3], color1=(255, 255, 255), color2=(152, 25, 255)):
     global game_time
     points = []
     for i in range(8):
@@ -120,7 +120,7 @@ def particle_burst(loc, amt):
         angle = random.randint(1, 360)
         speed = random.randint(20, 80) / 10
         vel = [math.cos(angle) * speed, math.sin(angle) * speed]
-        particles.append(particles_m.Particle(loc[0], loc[1], 'light', vel, 0.8, 2 + random.randint(0, 20) / 10, custom_color=(255, 255, 255)))
+        particles.append(particles_m.Particle(loc[0], loc[1], 'red_light', vel, 0.8, 2 + random.randint(0, 20) / 10, custom_color=(255, 255, 255)))
 
 animations = anim_loader.AnimationManager()
 
@@ -137,14 +137,14 @@ particles = []
 sparks = []
 
 font = text.Font('data/fonts/small_font.png', (255, 255, 255))
-blue_font = text.Font('data/fonts/small_font.png', (0, 152, 219))
-red_font = text.Font('data/fonts/small_font.png', (244, 89, 120))
-black_font = text.Font('data/fonts/small_font.png', (0, 0, 1))
+purple_font = text.Font('data/fonts/small_font.png', (192, 118, 237))
+red_font = text.Font('data/fonts/small_font.png', (204, 63, 63))
+black_font = text.Font('data/fonts/small_font.png', (10, 10, 10))
 
 player = Entity(animations, level_spawns[level_name], (7, 13), 'player')
-soul = Entity(animations, level_spawns[level_name], (7, 13), 'soul')
+grape = Entity(animations, level_spawns[level_name], (7, 13), 'grape')
 player_mana = 1
-soul.offset = [-1, -1]
+grape.offset = [-1, -1]
 player_velocity = [0, 0]
 air_timer = 0
 
@@ -172,7 +172,7 @@ events = {
 }
 next_level = False
 
-soul_mode = 0
+grape_mode = 0
 
 player_message = [0, '', '']
 player_bubble_size = 0
@@ -193,7 +193,7 @@ pygame.mixer.music.load('data/music_1.wav')
 pygame.mixer.music.play(-1)
 
 while True:
-    display.fill((20, 19, 39))
+    display.fill((20, 17, 14))
 
     game_time += 1
     level_time += 1
@@ -214,6 +214,7 @@ while True:
         if map_transition > 120:
             map_transition = 0
 
+ # background
     b_points = [[0, 16]]
     b_points += [[display.get_width() / 30 * (i + 1) + math.sin((game_time + i * 120) / 4) * 8, 16 + math.sin((game_time + i * 10) / 10) * 4] for i in range(29)]
     b_points += [[display.get_width(), 16], [display.get_width(), 0], [0, 0]]
@@ -222,11 +223,11 @@ while True:
     b2_points += [[display.get_width(), 16], [display.get_width(), 0], [0, 0]]
     b2_points = [[display.get_width() - p[0], p[1] * 3] for p in b2_points]
     back_surf = pygame.Surface((display.get_width(), 72))
-    pygame.draw.polygon(back_surf, (15, 10, 24), b2_points)
     back_surf.set_colorkey((0, 0, 0))
     display.blit(back_surf, (0, 0))
     display.blit(pygame.transform.flip(back_surf, False, True), (0, display.get_height() - 72))
 
+    # camera
     if (not map_transition) or (map_transition > 60):
         zoom += (1 - zoom) / 7
         if abs(1 - zoom) < 0.005:
@@ -249,6 +250,7 @@ while True:
         scroll[0] = max(level_map.left * TILE_SIZE + TILE_SIZE * 3 - zoom_offset[0], min(level_map.right * TILE_SIZE - display.get_width() - TILE_SIZE * 2 + zoom_offset[0], scroll[0]))
         scroll[1] = max(level_map.top * TILE_SIZE + TILE_SIZE * 3 - zoom_offset[1], min(level_map.bottom * TILE_SIZE - display.get_height() - TILE_SIZE * 4 + zoom_offset[1], scroll[1]))
 
+    # door
     if door:
         display.blit(door_img, (door[0] - scroll[0], door[1] - scroll[1]))
         if random.randint(1, 7) == 1:
@@ -260,6 +262,7 @@ while True:
                 next_level = True
                 sounds['door'].play()
 
+    # render tiles
     render_list = level_map.get_visible(scroll)
     collideables = []
     for layer in render_list:
@@ -279,31 +282,32 @@ while True:
                 if random.randint(1, 6) == 1:
                     particles.append(particles_m.Particle(tile[0][0] + 6, tile[0][1] + 4, 'light', [random.randint(0, 10) / 10 - 0.5, random.randint(0, 10) / 10 - 2], 0.1, 3 + random.randint(0, 20) / 10, custom_color=(255, 255, 255)))
                 torch_sin = math.sin((tile[0][1] % 100 + 200) / 300 * game_time * 0.01)
-                particles_m.blit_center_add(display, particles_m.circle_surf(15 + (torch_sin + 3) * 8.5, (4 + (torch_sin + 4) * 0.3, 8 + (torch_sin + 4) * 0.5, 18 + (torch_sin + 4) * 0.9)), (tile[0][0] - scroll[0] + 6, tile[0][1] - scroll[1] + 4))
-                particles_m.blit_center_add(display, particles_m.circle_surf(9 + (torch_sin + 3) * 4, (4 + (torch_sin * 1.3 + 4) * 0.3, 8 + (torch_sin + 4) * 0.5, 18 + (torch_sin + 4) * 0.9)), (tile[0][0] - scroll[0] + 6, tile[0][1] - scroll[1] + 4))
+                particles_m.blit_center_add(display, particles_m.circle_surf(12 + (torch_sin + 3) * 6, (18 + (torch_sin + 4) * 0.3, 8 + (torch_sin + 4) * 0.5, 2 + (torch_sin + 4) * 0.9)), (tile[0][0] - scroll[0] + 6, tile[0][1] - scroll[1] + 4))
+                particles_m.blit_center_add(display, particles_m.circle_surf(8 + (torch_sin + 3) * 4, (18 + (torch_sin * 1.3 + 4) * 0.3, 8 + (torch_sin + 4) * 0.5, 2 + (torch_sin + 4) * 0.9)), (tile[0][0] - scroll[0] + 6, tile[0][1] - scroll[1] + 4))
             if (tile[1][0] == 'decorations') and (tile[1][1] == 0):
                 if random.randint(1, 2) == 1:
                     p_offset = random.choice([[-8, 1], [8, 1], [4, 4], [-4, 4]])
                     particles.append(particles_m.Particle(tile[0][0] + TILE_SIZE + p_offset[0], tile[0][1] + TILE_SIZE * 1.5 + p_offset[1], 'light', [random.randint(0, 10) / 10 - 0.5, random.randint(0, 10) / 10 - 2], 0.1, 4 + random.randint(0, 20) / 10, custom_color=(255, 255, 255)))
                 torch_sin = math.sin((tile[0][1] % 100 + 200) / 300 * game_time * 0.01)
-                particles_m.blit_center_add(display, particles_m.circle_surf(15 + (torch_sin + 3) * 8.5, (4 + (torch_sin + 4) * 0.4, 8 + (torch_sin + 4) * 0.7, 18 + (torch_sin + 4) * 1.3)), (tile[0][0] - scroll[0] + TILE_SIZE, tile[0][1] - scroll[1] + TILE_SIZE * 1.5))
-                particles_m.blit_center_add(display, particles_m.circle_surf(9 + (torch_sin + 3) * 4, (4 + (torch_sin * 1.3 + 4) * 0.4, 8 + (torch_sin + 4) * 0.7, 18 + (torch_sin + 4) * 1.3)), (tile[0][0] - scroll[0] + TILE_SIZE, tile[0][1] - scroll[1]  + TILE_SIZE * 1.5))
+                particles_m.blit_center_add(display, particles_m.circle_surf(12 + (torch_sin + 3) * 6, (18 + (torch_sin + 4) * 0.4, 8 + (torch_sin + 4) * 0.7, 2 + (torch_sin + 4) * 1.3)), (tile[0][0] - scroll[0] + TILE_SIZE, tile[0][1] - scroll[1] + TILE_SIZE * 1.5))
+                particles_m.blit_center_add(display, particles_m.circle_surf(8 + (torch_sin + 3) * 4, (18 + (torch_sin * 1.3 + 4) * 0.4, 8 + (torch_sin + 4) * 0.7, 2 + (torch_sin + 4) * 1.3)), (tile[0][0] - scroll[0] + TILE_SIZE, tile[0][1] - scroll[1]  + TILE_SIZE * 1.5))
             if tile[1][0] != 'mana':
                 img = spritesheet_loader.get_img(spritesheets, tile[1])
                 display.blit(img, (math.floor(tile[0][0] - scroll[0] + offset[0]), math.floor(tile[0][1] - scroll[1] + offset[1])))
             else:
                 render_mana([tile[0][0] + 6 - scroll[0], tile[0][1] + 6 - scroll[1]])
                 torch_sin = math.sin((tile[0][1] % 100 + 200) / 300 * game_time * 0.01)
-                particles_m.blit_center_add(display, particles_m.circle_surf(15 + (torch_sin + 3) * 8.5, (4 + (torch_sin + 4) * 0.3, 8 + (torch_sin + 4) * 0.5, 18 + (torch_sin + 4) * 0.9)), (tile[0][0] - scroll[0] + 6, tile[0][1] - scroll[1] + 4))
-                particles_m.blit_center_add(display, particles_m.circle_surf(9 + (torch_sin + 3) * 4, (4 + (torch_sin * 1.3 + 4) * 0.3, 8 + (torch_sin + 4) * 0.5, 18 + (torch_sin + 4) * 0.9)), (tile[0][0] - scroll[0] + 6, tile[0][1] - scroll[1] + 4))
+                particles_m.blit_center_add(display, particles_m.circle_surf(10 + (torch_sin + 3) * 2.5, (9 + (torch_sin + 4) * 0.3, 6 + (torch_sin + 4) * 0.5, 15 + (torch_sin + 4) * 0.9)), (tile[0][0] - scroll[0] + 6, tile[0][1] - scroll[1] + 4))
+                particles_m.blit_center_add(display, particles_m.circle_surf(7 + (torch_sin + 3) * 1, (9 + (torch_sin * 1.3 + 4) * 0.3, 6 + (torch_sin + 4) * 0.5, 15 + (torch_sin + 4) * 0.9)), (tile[0][0] - scroll[0] + 6, tile[0][1] - scroll[1] + 4))
 
+    # player
     player.update(1 / 60 * dt)
     air_timer += 1
 
     if not map_transition:
         player_velocity[1] = min(player_velocity[1] + 0.23 * dt, 5)
     movement = player_velocity.copy()
-    if not death and not soul_mode and not map_transition:
+    if not death and not grape_mode and not map_transition:
         if right:
             movement[0] += 1.5
         if left:
@@ -330,7 +334,7 @@ while True:
         player.set_action('run')
     else:
         player.set_action('idle')
-        if soul_mode:
+        if grape_mode:
             player.set_action('idle', True)
 
     if movement[0] > 0:
@@ -338,41 +342,41 @@ while True:
     if movement[0] < 0:
         player.flip[0] = True
 
-    if soul_mode:
+    if grape_mode:
         player.opacity = 120
         movement = [0, 0]
         if right:
-            movement[0] += 1.25 * dt
+            movement[0] += 1.3 * dt
         if left:
-            movement[0] -= 1.25 * dt
+            movement[0] -= 1.3 * dt
         if up:
-            movement[1] -= 1.25 * dt
+            movement[1] -= 1.3 * dt
         if down:
-            movement[1] += 1.25 * dt
-        soul_mode += max(dt, 0.3)
+            movement[1] += 1.3 * dt
+        grape_mode += max(dt, 0.3)
         if auto_return[level_name]:
-            if soul_mode > 275:
-                soul_mode = 0
-                sounds['exit_soul'].play()
+            if grape_mode > 275:
+                grape_mode = 0
+                sounds['exit_grape'].play()
                 particle_burst(player.center, 50)
-                player.pos = soul.pos.copy()
+                player.pos = grape.pos.copy()
                 particle_burst(player.center, 50)
                 scroll_target = player.pos
                 player_velocity[1] = 0
-        soul.move(movement, collideables)
-        if soul.pos[0] < scroll[0]:
-            soul.pos[0] = scroll[0]
-        if soul.pos[0] > scroll[0] + display.get_width():
-            soul.pos[0] = scroll[0] + display.get_width()
-        if soul.pos[1] < scroll[1]:
-            soul.pos[1] = scroll[1]
-        if soul.pos[1] > scroll[1] + display.get_height():
-            soul.pos[1] = scroll[1] + display.get_height()
+        grape.move(movement, collideables)
+        if grape.pos[0] < scroll[0]:
+            grape.pos[0] = scroll[0]
+        if grape.pos[0] > scroll[0] + display.get_width():
+            grape.pos[0] = scroll[0] + display.get_width()
+        if grape.pos[1] < scroll[1]:
+            grape.pos[1] = scroll[1]
+        if grape.pos[1] > scroll[1] + display.get_height():
+            grape.pos[1] = scroll[1] + display.get_height()
         if random.randint(1, 3) == 1:
-            particles.append(particles_m.Particle(soul.pos[0] + 3, soul.pos[1] + 4, 'light', [random.randint(0, 10) / 10 - 0.5, random.randint(0, 10) / 10 + 1], 0.2, 3 + random.randint(0, 20) / 10, custom_color=(255, 255, 255)))
-        torch_sin = math.sin((soul.center[1] % 100 + 200) / 300 * game_time * 0.1)
-        particles_m.blit_center_add(display, particles_m.circle_surf(7 + (torch_sin + 3) * 3, (4 + (torch_sin + 4) * 0.3, 8 + (torch_sin + 4) * 0.5, 18 + (torch_sin + 4) * 0.9)), (soul.center[0] - 1 - scroll[0], soul.center[1] - 4 - scroll[1]))
-        particles_m.blit_center_add(display, particles_m.circle_surf(5 + (torch_sin + 3) * 2, (4 + (torch_sin * 1.3 + 4) * 0.3, 8 + (torch_sin + 4) * 0.5, 18 + (torch_sin + 4) * 0.9)), (soul.center[0] - 1 - scroll[0], soul.center[1] - 4 - scroll[1]))
+            particles.append(particles_m.Particle(grape.pos[0] + 3, grape.pos[1] + 4, 'red_light', [random.randint(0, 10) / 10 - 0.5, random.randint(0, 10) / 10 + 1], 0.2, 3 + random.randint(0, 20) / 10, custom_color=(255, 255, 255)))
+        torch_sin = math.sin((grape.center[1] % 100 + 200) / 300 * game_time * 0.1)
+        particles_m.blit_center_add(display, particles_m.circle_surf(5 + (torch_sin + 3) * 3, (9 + (torch_sin + 4) * 0.3, 6 + (torch_sin + 4) * 0.5, 15 + (torch_sin + 4) * 0.9)), (grape.center[0] - 1 - scroll[0], grape.center[1] - 4 - scroll[1]))
+        particles_m.blit_center_add(display, particles_m.circle_surf(3 + (torch_sin + 3) * 2, (9 + (torch_sin * 1.3 + 4) * 0.3, 6 + (torch_sin + 4) * 0.5, 15 + (torch_sin + 4) * 0.9)), (grape.center[0] - 1 - scroll[0], grape.center[1] - 4 - scroll[1]))
         if tutorial_2 == 0:
             tutorial_2 = 1
     else:
@@ -392,7 +396,7 @@ while True:
                     sparks.append([tile_center.copy(), math.pi / 2 + math.pi * i, 10, 6, (255, 255, 255)])
                     sparks.append([tile_center.copy(), math.pi * i, 6, 3, (255, 255, 255)])
                 for i in range(20):
-                    particles.append(particles_m.Particle(tile_center[0], tile_center[1], 'light', [random.randint(0, 10) / 10 - 0.5, (random.randint(0, 120) / 10 + 1) * random.choice([-1, 1])], 0.1, 2 + random.randint(0, 20) / 10, custom_color=(255, 255, 255)))
+                    particles.append(particles_m.Particle(tile_center[0], tile_center[1], 'red_light', [random.randint(0, 10) / 10 - 0.5, (random.randint(0, 120) / 10 + 1) * random.choice([-1, 1])], 0.1, 2 + random.randint(0, 20) / 10, custom_color=(255, 255, 255)))
         if rm:
             del tile[rm]
 
@@ -409,53 +413,54 @@ while True:
                 print(player.pos)
             if event.key == K_q:
                 player_message = [180, 'Hee', '']
-            if event.key == K_RIGHT:
+            if event.key == pygame.K_d:
                 right = True
                 if not tutorial:
                     tutorial = 1
-            if event.key == K_LEFT:
+            if event.key == pygame.K_a:
                 left = True
-            if event.key == K_DOWN:
+            if event.key == pygame.K_s:
                 if not ready_to_exit:
                     if (level_name != 'level_1') or (events['lv1'] != 0) and (not map_transition):
-                        if soul_mode == 0:
+                        if grape_mode == 0:
                             if player_mana > 0:
-                                soul_mode = 1
-                                sounds['enter_soul'].play()
-                                soul.pos = player.pos.copy()
+                                grape_mode = 1
+                                sounds['enter_grape'].play()
+                                grape.pos = player.pos.copy()
                                 player.pos = player.pos.copy()
                                 particle_burst(player.center, 50)
                                 player_mana -= 1
                             else:
                                 player_message = [200, 'Give me mana!', '']
                 else:
-                    player_message = [300, 'Fucking go UP...!!', '']
+                    player_message = [300, 'Go UP...!!', '']
                 down = True
-            if event.key == K_UP:
-                if not death and (air_timer < 5) and not soul_mode and not map_transition:
+            if event.key == pygame.K_w:
+                if not death and (air_timer < 5) and not grape_mode and not map_transition:
                     sounds['jump'].play()
                     player_velocity[1] = -5.2
                     sparks.append([list(player.rect.bottomleft), math.pi * 0.9, 2 + random.randint(0, 10) / 10, 5, (255, 255, 255)])
                     sparks.append([list(player.rect.bottomright), math.pi * 0.1, 2 + random.randint(0, 10) / 10, 5, (255, 255, 255)])
                 up = True
         if event.type == KEYUP:
-            if event.key == K_RIGHT:
+            if event.key == pygame.K_d:
                 right = False
-            if event.key == K_LEFT:
+            if event.key == pygame.K_a:
                 left = False
-            if event.key == K_DOWN:
+            if event.key == pygame.K_s:
                 down = False
-            if event.key == K_UP:
+            if event.key == pygame.K_w:
                 up = False
 
     if death:
         player.render(display, scroll)
 
+    # eye
     eye_base = [386, 220]
-    if not soul_mode:
+    if not grape_mode:
         eye_angle = player.get_angle(eye_base) + math.pi
     else:
-        eye_angle = soul.get_angle(eye_base) + math.pi
+        eye_angle = grape.get_angle(eye_base) + math.pi
     if level_name == 'level_3':
         if (6200 < events['lv3timer'] < 6600):
             eye_base = [386 + random.randint(0, 8) - 4, 220 + random.randint(0, 8) - 4]
@@ -473,6 +478,7 @@ while True:
                 pygame.draw.circle(display, (244, 89, 120), eye_center, 5 * (eye_height / 60 + 0.7))
                 pygame.draw.circle(display, (0, 0, 0), eye_center, 4 * (eye_height / 60 + 0.7))
 
+    # events
     dt = (time.time() - last_time) * 60
     last_time = time.time()
 
@@ -484,7 +490,7 @@ while True:
                 events['lv1note'] = 1
         if (events['lv1note'] == 1) and player_mana:
             if events['lv1mana'] and (player_bubble_size < 0.05) and (player_message[0] == 0) and (level_time > 2500):
-                player_message = [500, 'I can travel up with soul release.', '']
+                player_message = [500, 'I can travel up with grape release.', '']
                 events['lv1note'] = 2
         if not events['lv1mana']:
             if player.pos[0] > 530:
@@ -506,20 +512,20 @@ while True:
             if events['lv1'] != -1:
                 events['lv1'] += dt
                 if events['lv1'] > 33:
-                    if not soul_mode:
+                    if not grape_mode:
                         dt = 0
                     else:
                         dt = 0.5
                     if tutorial_2 == -1:
                         tutorial_2 = 0
-                if soul_mode > 20:
+                if grape_mode > 20:
                     events['lv1'] = -1
 
     if level_name == 'level_2':
         last = events['lv2timer']
         events['lv2timer'] += dt
         if events['lv2timer'] < 6:
-            player_message = [300, 'Fuck go back...', '']
+            player_message = [300, 'Go back...', '']
         if (last < 920) and (events['lv2timer'] >= 920):
             reset = True
             player_message = [300, 'I hate my life', '']
@@ -553,7 +559,7 @@ while True:
         last = events['lv3timer']
         events['lv3timer'] += dt
         if events['lv3timer'] < 6:
-            player_message = [200, 'Fuck...', '']
+            player_message = [200, 'Oh...', '']
         if (200 < events['lv3timer'] < 800):
             eye_target_height = 30
             if random.randint(0, 70) == 0:
@@ -651,19 +657,20 @@ while True:
         if (last < 1200) and (events['lv3timer'] >= 1200):
             player_message = [200, 'There\'s more?', '']
     if reset:
-        if soul_mode:
-            soul_mode = 0
-            sounds['exit_soul'].play()
+        if grape_mode:
+            grape_mode = 0
+            sounds['exit_grape'].play()
             particle_burst(player.center, 50)
-            player.pos = soul.pos.copy()
+            player.pos = grape.pos.copy()
             particle_burst(player.center, 50)
             scroll_target = player.pos
             player_velocity[1] = 0
 
-    if not soul_mode:
+    # projectiles
+    if not grape_mode:
         r = player.rect
     else:
-        r = pygame.Rect(soul.center[0] - 3, soul.center[1] - 7, 7, 7)
+        r = pygame.Rect(grape.center[0] - 3, grape.center[1] - 7, 7, 7)
     for projectile in projectiles:
         # pos, velocity, type
         if len(projectile) == 3:
@@ -676,7 +683,7 @@ while True:
                     if r.collidepoint(projectile[0]):
                         sounds['death'].play()
                         death = 1
-                        soul_mode = 0
+                        grape_mode = 0
                         scroll_target = scroll_target.copy()
                         for i in range(30):
                             sparks.append([list(r.center), math.radians(random.randint(1, 360)), 5 + random.randint(0, 30) / 10, 4, (255, 255, 255)])
@@ -684,9 +691,9 @@ while True:
                             angle = random.randint(1, 360)
                             speed = random.randint(70, 250) / 10
                             vel = [math.cos(angle) * speed, math.sin(angle) * speed]
-                            particles.append(particles_m.Particle(r.center[0], r.center[1], 'light', vel, 0.4, 2 + random.randint(0, 20) / 10, custom_color=(255, 255, 255)))
+                            particles.append(particles_m.Particle(r.center[0], r.center[1], 'red_light', vel, 0.4, 2 + random.randint(0, 20) / 10, custom_color=(255, 255, 255)))
                 display.blit(proj_img, (projectile[0][0] - scroll[0] - 2, projectile[0][1] - scroll[1] - 2))
-                particles_m.blit_center_add(display, particles_m.circle_surf(3 + 3 * (math.sin(projectile[3] * game_time * 0.15) + 3), (20, 6, 12)), (projectile[0][0] - scroll[0], projectile[0][1] - scroll[1]))
+                particles_m.blit_center_add(display, particles_m.circle_surf(3 + 3 * (math.sin(projectile[3] * game_time * 0.15) + 3), (18, 17, 5)), (projectile[0][0] - scroll[0], projectile[0][1] - scroll[1]))
     if level_name != 'level_3':
         projectiles = projectiles[-300:]
     else:
@@ -705,8 +712,8 @@ while True:
             projectiles.append([spawn, vel, 'enemy'])
             sounds['eye_shoot'].play()
 
+    # sparks
     for i, spark in sorted(enumerate(sparks), reverse=True):
-        # pos, rot, speed, scale, color
         advance(spark[0], spark[1], spark[2] * dt)
         spark[2] -= 0.2 * dt
         if spark[2] < 0:
@@ -721,8 +728,9 @@ while True:
         point_list = [[p[0] - scroll[0], p[1] - scroll[1]] for p in point_list]
         pygame.draw.polygon(display, spark[4], point_list)
 
+    # border fog
     fog_surf = pygame.Surface((display.get_width(), 24))
-    pygame.draw.polygon(fog_surf, (0, 2, 4), b_points)
+    pygame.draw.polygon(fog_surf, (4, 2, 4), b_points)
     fog_surf.set_alpha(150)
     fog_surf.set_colorkey((0, 0, 0))
     display.blit(pygame.transform.flip(fog_surf, True, False), (0, -6))
@@ -735,23 +743,27 @@ while True:
     display.blit(pygame.transform.flip(side_fog, True, True), (display.get_width() - 24, 0))
     display.blit(pygame.transform.flip(side_fog, True, False), (display.get_width() - 24 + 6, 0))
 
+    # particles
     for i, particle in sorted(enumerate(particles), reverse=True):
         alive = particle.update(0.1 * dt)
         particle.draw(display, scroll)
         if particle.type == 'light':
-            particles_m.blit_center_add(display, particles_m.circle_surf(5 + particle.time_left * 0.5 * (math.sin(particle.random_constant * game_time * 0.01) + 3), (1 + particle.time_left * 0.2, 4 + particle.time_left * 0.4, 8 + particle.time_left * 0.6)), (particle.x - scroll[0], particle.y - scroll[1]))
+            particles_m.blit_center_add(display, particles_m.circle_surf(1 + particle.time_left * 0.5 * (math.sin(particle.random_constant * game_time * 0.01) + 3), (15 + particle.time_left * 0.6, 3 + particle.time_left * 0.4, 1 + particle.time_left * 0.2)), (particle.x - scroll[0], particle.y - scroll[1]))
         if particle.type == 'red_light':
-            particles_m.blit_center_add(display, particles_m.circle_surf(5 + particle.time_left * 0.5 * (math.sin(particle.random_constant * game_time * 0.01) + 3), (8 + particle.time_left * 0.6, 1 + particle.time_left * 0.2, 4 + particle.time_left * 0.4)), (particle.x - scroll[0], particle.y - scroll[1]))
+            particles_m.blit_center_add(display, particles_m.circle_surf(1 + particle.time_left * 0.5 * (math.sin(particle.random_constant * game_time * 0.01) + 3), (9 + particle.time_left * 0.6, 6 + particle.time_left * 0.2, 15 + particle.time_left * 0.4)), (particle.x - scroll[0], particle.y - scroll[1]))
         if not alive:
             particles.pop(i)
 
+    # door vfx
     if door:
         particles_m.blit_center_add(display, particles_m.circle_surf(7 + 4 * (math.sin(game_time * 0.15) + 3), (20, 6, 12)), (door[0] + 6 - scroll[0], door[1] + 9 - scroll[1]))
         render_mana([door[0] - scroll[0] + 6, door[1] - scroll[1] + 9], size=[2, 3], color1=(0, 0, 1), color2=(244, 89, 120))
 
-    if soul_mode:
-        soul.render(display, scroll)
+    # render grape
+    if grape_mode:
+        grape.render(display, scroll)
 
+    # gui
     if player_message[0] and not death:
         player_message[0] -= 1
         if player_message[0] % 3 == 0:
@@ -768,12 +780,12 @@ while True:
         [-30, -17],
     ]
     for i, p in enumerate(player_bubble_positions):
-        if not soul_mode:
+        if not grape_mode:
             p[0] += (player.pos[0] + relative_positions[i][0] - p[0]) / (3 + i * 3)
             p[1] += (player.pos[1] + relative_positions[i][1] - p[1]) / (3 + i * 3)
         else:
-            p[0] += (soul.pos[0] + relative_positions[i][0] - p[0]) / (3 + i * 3)
-            p[1] += (soul.pos[1] + relative_positions[i][1] - p[1]) / (3 + i * 3)
+            p[0] += (grape.pos[0] + relative_positions[i][0] - p[0]) / (3 + i * 3)
+            p[1] += (grape.pos[1] + relative_positions[i][1] - p[1]) / (3 + i * 3)
     if player_bubble_size > 0.05:
         for i, p in enumerate(player_bubble_positions):
             points = []
@@ -795,19 +807,19 @@ while True:
     if tutorial < 200:
         if tutorial != 0:
             tutorial += (display.get_width() - tutorial) / 7
-        black_font.render('arrow keys to move and jump', display, (display.get_width() // 2 + tutorial - font.width('arrow keys to move and jump') // 2 + 1, display.get_height() // 2 - 10))
-        blue_font.render('arrow keys to move and jump', display, (display.get_width() // 2 + tutorial - font.width('arrow keys to move and jump') // 2, display.get_height() // 2 - 11))
-        font.render('arrow keys to move and jump', display, (display.get_width() // 2 + tutorial - font.width('arrow keys to move and jump') // 2, display.get_height() // 2 - 12))
+        black_font.render('WASD keys to move and jump', display, (display.get_width() // 2 + tutorial - font.width('WASD keys to move and jump') // 2 + 1, display.get_height() // 2 - 10))
+        purple_font.render('WASD keys to move and jump', display, (display.get_width() // 2 + tutorial - font.width('WASD keys to move and jump') // 2, display.get_height() // 2 - 11))
+        font.render('WASD keys to move and jump', display, (display.get_width() // 2 + tutorial - font.width('WASD keys to move and jump') // 2, display.get_height() // 2 - 12))
     if tutorial_2 < 200:
         if tutorial_2 > 0:
             tutorial_2 += (display.get_width() - tutorial_2) / 7
         if tutorial_2 != -1:
-            black_font.render('use down arrow to using soul', display, (display.get_width() // 2 + tutorial_2 - font.width('use down arrow to using soul') // 2 + 1, display.get_height() // 2 - 10))
-            blue_font.render('use down arrow to using soul', display, (display.get_width() // 2 + tutorial_2 - font.width('use down arrow to using soul') // 2, display.get_height() // 2 - 11))
-            font.render('use down arrow to using soul', display, (display.get_width() // 2 + tutorial_2 - font.width('use down arrow to using soul') // 2, display.get_height() // 2 - 12))
+            black_font.render('use S to using grape', display, (display.get_width() // 2 + tutorial_2 - font.width('use S to using grape') // 2 + 1, display.get_height() // 2 - 10))
+            purple_font.render('use S to using grape', display, (display.get_width() // 2 + tutorial_2 - font.width('use S to using grape') // 2, display.get_height() // 2 - 11))
+            font.render('use S to using grape', display, (display.get_width() // 2 + tutorial_2 - font.width('use S to using grape') // 2, display.get_height() // 2 - 12))
     if level_name == 'level_4':
         black_font.render('Thanks for playing!', display, (display.get_width() // 2 - font.width('Thanks for playing!') // 2 + 1, display.get_height() // 2 - 10))
-        blue_font.render('Thanks for playing!', display, (display.get_width() // 2 - font.width('Thanks for playing!') // 2, display.get_height() // 2 - 11))
+        purple_font.render('Thanks for playing!', display, (display.get_width() // 2 - font.width('Thanks for playing!') // 2, display.get_height() // 2 - 11))
         font.render('Thanks for playing!', display, (display.get_width() // 2 - font.width('Thanks for playing!') // 2, display.get_height() // 2 - 12))
 
     no_mana = ''
@@ -815,7 +827,7 @@ while True:
         no_mana = 'no '
     black_font.render(no_mana + 'mana', display, (5, 6))
     if player_mana:
-        blue_font.render(no_mana + 'mana', display, (5, 5))
+        purple_font.render(no_mana + 'mana', display, (5, 5))
     else:
         red_font.render(no_mana + 'mana', display, (5, 5))
     font.render(no_mana + 'mana', display, (5, 4))

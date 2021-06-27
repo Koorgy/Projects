@@ -1,5 +1,4 @@
 import pygame, math
-
 def read_f(path):
     f = open(path, 'r')
     dat = f.read()
