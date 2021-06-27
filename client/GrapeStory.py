@@ -58,6 +58,7 @@ sounds = {k.split('.')[0]: pygame.mixer.Sound('data/sfx/' + k) for k in os.listd
 sounds['eye_shoot'].set_volume(0.7)
 sounds['jump'].set_volume(0.3)
 
+score = 5000
 
 def reload_level(restart_audio=True):
     global player, projectiles, particles, scroll_target, events, grape_mode, level_time, player_mana, level_map, player_message, zoom, death, next_level, door, ready_to_exit
